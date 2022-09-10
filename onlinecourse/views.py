@@ -123,30 +123,26 @@ def submit(request, course_id):
     return HttpResponseRedirect(reverse(viewname='onlinecourse:result', args=(course.id, submission.id)))
 
 
-# <HINT> Create an exam result view to check if learner passed exam and show their question results and result for each question,
-# you may implement it based on the following logic:
-        # Get course and submission based on their ids
-        # Get the selected choice ids from the submission record
-        # For each selected choice, check if it is a correct answer or not
-        # Calculate the total score
+
 def show_exam_result(request, course_id, submission_id):
+    context = {}
+
     course = get_object_or_404(Course, pk=course_id)
+    context['course'] = course
+
     submission = get_object_or_404(Submission, pk=submission_id)
-    choices = Choice.objects.filter(submission = submission)
+    context['selected_ids'] = Choice.objects.filter(submission = submission).values_list('id', flat=True)
 
-    # need to fix this, check each question for correctness by sending only the choises for that question
-    correct_choice_ids = []
-    for choice in choices:
-        if choice.is_correct:
-            correct_choice_ids.append(choice.id)
-
-    correct_question_ids = []
+    max_points = 0
+    points = 0
     for question in course.question_set.all():
-        if question.is_correct(correct_choice_ids):
-            correct_question_ids.append(question.id)
+        points = points + question.get_grade(Choice.objects.filter(submission = submission, question = question).values_list('id', flat=True))
+        max_points = max_points + question.grade
 
-    return HttpResponse("Correct questions = " + str(len(correct_question_ids)))
+    score = int((points / max_points) * 100)
+    context['grade'] = score
 
+    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
 
 
 

@@ -94,13 +94,15 @@ class Question(models.Model):
     question_text = models.TextField(max_length=255, default="")
     grade = models.IntegerField(default=0)
 
-    def is_correct(self, selected_ids):
+    def get_grade(self, selected_ids):
         all_answers = self.choice_set.filter(is_correct=True).count()
         selected_correct = self.choice_set.filter(is_correct=True, id__in=selected_ids).count()
-        if all_answers == selected_correct:
-            return True
+        # if all provided answers are correct and equal the question correct answers and there are no wrong selections
+        # then return the designated grade
+        if all_answers == selected_correct and len(selected_ids) == selected_correct:
+            return self.grade
         else:
-            return False
+            return 0
 
 class Choice(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
