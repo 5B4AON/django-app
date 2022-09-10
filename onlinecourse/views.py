@@ -1,7 +1,7 @@
 from django.shortcuts import render
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 # <HINT> Import any new Models here
-from .models import Course, Enrollment
+from .models import Course, Enrollment, Question, Choice, Submission
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
@@ -103,25 +103,24 @@ def enroll(request, course_id):
     return HttpResponseRedirect(reverse(viewname='onlinecourse:course_details', args=(course.id,)))
 
 
-# <HINT> Create a submit view to create an exam submission record for a course enrollment,
-# you may implement it based on following logic:
-         # Get user and course object, then get the associated enrollment object created when the user enrolled the course
-         # Create a submission object referring to the enrollment
-         # Collect the selected choices from exam form
-         # Add each selected choice object to the submission object
-         # Redirect to show_exam_result with the submission id
-#def submit(request, course_id):
+def submit(request, course_id):
+    user = request.user
+    course = get_object_or_404(Course, pk=course_id)
+    enrollment = Enrollment.objects.get(user=user, course=course)
+    choice_ids = []
 
+    for key in request.POST:
+        if key.startswith('choice'):
+            value = request.POST[key]
+            choice_id = int(value)
+            choice_ids.append(choice_id)
 
-# <HINT> A example method to collect the selected choices from the exam form from the request object
-#def extract_answers(request):
-#    submitted_anwsers = []
-#    for key in request.POST:
-#        if key.startswith('choice'):
-#            value = request.POST[key]
-#            choice_id = int(value)
-#            submitted_anwsers.append(choice_id)
-#    return submitted_anwsers
+    choices = Choice.objects.filter(id__in=choice_ids)
+    submission = Submission.objects.create(enrollment=enrollment)
+    for choice in choices:
+        submission.choices.add(choice)
+
+    return HttpResponseRedirect(reverse(viewname='onlinecourse:result', args=(course.id, submission.id)))
 
 
 # <HINT> Create an exam result view to check if learner passed exam and show their question results and result for each question,
@@ -130,7 +129,24 @@ def enroll(request, course_id):
         # Get the selected choice ids from the submission record
         # For each selected choice, check if it is a correct answer or not
         # Calculate the total score
-#def show_exam_result(request, course_id, submission_id):
+def show_exam_result(request, course_id, submission_id):
+    course = get_object_or_404(Course, pk=course_id)
+    submission = get_object_or_404(Submission, pk=submission_id)
+    choices = Choice.objects.filter(submission = submission)
+
+    # need to fix this, check each question for correctness by sending only the choises for that question
+    correct_choice_ids = []
+    for choice in choices:
+        if choice.is_correct:
+            correct_choice_ids.append(choice.id)
+
+    correct_question_ids = []
+    for question in course.question_set.all():
+        if question.is_correct(correct_choice_ids):
+            correct_question_ids.append(question.id)
+
+    return HttpResponse("Correct questions = " + str(len(correct_question_ids)))
+
 
 
 
